@@ -1,0 +1,53 @@
+// element-plus 主题变量,如果需要对ele组件的样式修改的话，直接这样修改
+/* @forward "element-plus/theme-chalk/src/common/var.scss" with (
+  $colors: (
+    "primary": (
+      // 默认主题色 - 修改此值时需同步修改 src/settings.ts 中的 themeColor
+      "base": #4080ff,
+    ),
+    "success": (
+      "base": #23c343,
+    ),
+    "warning": (
+      "base": #ff9a2e,
+    ),
+    "danger": (
+      "base": #f76560,
+    ),
+    "info": (
+      "base": #a9aeb8,
+    ),
+  ),
+
+  $bg-color: (
+    "page": #f5f8fd,
+  )
+); */
+
+/** 全局CSS变量 */
+
+:root {
+  --menu-background: #fff; // 菜单背景色
+  --menu-text: #212121; // 菜单文字颜色 浅色主题-白色侧边栏配色下仅占位，实际颜色由 el-menu-item 组件决定
+}
+
+/** 浅色主题-深蓝色侧边栏配色 */
+html.sidebar-color-blue {
+  --menu-background: #304156; // 菜单背景色
+  --menu-text: #bfcbd9; // 菜单文字颜色
+}
+
+/** 暗黑主题 */
+html.dark {
+  --menu-background: var(--el-bg-color-overlay);
+  --menu-text: #fff;
+}
+
+// scss变量
+$menu-background: var(--menu-background); // 菜单背景色
+$bg-color: #d00909;
+
+$sidebar-width: 210px; // 侧边栏宽度
+$sidebar-width-collapsed: 54px; // 侧边栏收缩宽度
+$navbar-height: 50px; // 导航栏高度
+$tags-view-height: 34px; // TagsView 高度
