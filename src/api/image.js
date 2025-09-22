@@ -9,3 +9,11 @@ export function getImgMapListApi(params, data) {
     data,
   });
 }
+
+// 影像详情
+export const getImgInfoApi = (id) => {
+  return request({
+    url: `/image/info/${id}`,
+    method: "get",
+  });
+};

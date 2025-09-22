@@ -3,28 +3,31 @@ import VectorLayer from "ol/layer/Vector";
 import pinia from "../index";
 
 export const useMapStore = defineStore("map", () => {
-  const mapInstance = shallowRef(null); // 用来存储 Map 的实例
-  // const baseLayer = shallowRef(null); // 用来存储基础影像图层的实例
-  const activeImgLayer = shallowRef(null); // 用来存储当前激活的图层实例
-  const activeVecLayer = shallowRef(null); // 用来存储当前激活的矢量图层实例
+  // 用来存储 Map 的实例
+  const mapInstance = shallowRef(null);
+  // 用来存储当前激活的图层实例
+  const activeImgLayer = shallowRef(null);
+  // 用来存储当前激活的矢量图层实例，全局仅维持一个矢量图层
+  const activeVecLayer = shallowRef(null);
 
+  // 保存 Map 的实例
   function setMapInstance(map) {
     mapInstance.value = map; // 操作 ref/shallowRef 时需要 .value
   }
 
-  // 保存当前激活的图层实例
+  // 保存当前激活的影像图层
   function setActiveImgLayer(layer) {
     activeImgLayer.value = layer;
   }
 
-  // 激活矢量图层
+  // 保存当前激活矢量图层
   function setActiveVecLayer(layer) {
     activeVecLayer.value = layer;
   }
 
   // 重置矢量图层
   function resetActiveVectorLayer() {
-    // 如果图层存在就清除数
+    // 如果图层存在就清除数据源
     if (activeVecLayer.value) {
       activeVecLayer.value.getSource().clear();
     }
@@ -36,10 +39,10 @@ export const useMapStore = defineStore("map", () => {
       mapInstance.value.addLayer(vecLayer);
       activeVecLayer.value = vecLayer;
     }
-    console.log("重置矢量图层", activeVecLayer.value);
+    console.log("重置矢量图层");
   }
 
-  // 移除当前激活的图层
+  // 移除当前激活的影像图层
   function clearActiveImgLayer() {
     if (activeImgLayer.value) {
       mapInstance.value.removeLayer(activeImgLayer.value);

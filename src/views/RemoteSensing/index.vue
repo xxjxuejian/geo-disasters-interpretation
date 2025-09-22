@@ -5,7 +5,7 @@ import Interpretation from "./SideBar/Interpretation/index.vue";
 import DataOutput from "./SideBar/DataOutput/index.vue";
 import MAP from "./Map/index.vue";
 
-const activeSidebar = ref("data-input"); // 控制当前显示的侧边栏内容
+const activeSidebar = ref("data-output"); // 控制当前显示的侧边栏内容
 const isImageLayerVisible = ref(true); // 影像图层可见性状态
 const isVectorLayerVisible = ref(true); // 矢量图层可见性状态
 
@@ -55,7 +55,7 @@ const handleNavigation = (sidebarName) => {
 /* 侧边栏容器 */
 .sidebar {
   flex-shrink: 0; /* 防止侧边栏被压缩 */
-  width: 250px;
+  width: 350px;
   padding: 15px;
   overflow-y: auto; /* 如果内容过多则显示滚动条 */
   background-color: #f8f9fa;

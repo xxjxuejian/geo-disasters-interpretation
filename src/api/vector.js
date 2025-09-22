@@ -18,3 +18,11 @@ export const getVectorDetailApi = (params) => {
     params,
   });
 };
+
+// 矢量--详情
+export const getVectorInfoApi = (id) => {
+  return request({
+    url: `/vector/info/${id}`,
+    method: "get",
+  });
+};

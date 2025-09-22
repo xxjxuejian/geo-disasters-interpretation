@@ -10,6 +10,8 @@ import VectorLayer from "ol/layer/Vector";
 import VectorSource from "ol/source/Vector";
 import GeoJSON from "ol/format/GeoJSON.js";
 import { Style, Fill, Stroke, Circle as CircleStyle } from "ol/style.js";
+import Feature from "ol/Feature";
+import Polygon from "ol/geom/Polygon";
 
 const mapStore = useMapStoreHook();
 
@@ -25,13 +27,13 @@ export function initMap(mapEl) {
     zIndex: 1,
   });
 
-  // 2.1 添加影像地图的标记
+  // 2.1 添加影像地图的注记
   const labelLayer = new TileLayer({
     source: new XYZ({
       url: mapUrls["tian-label"],
     }),
     title: "道路标记",
-    zIndex: 11, // TODO: 道路标记层级要比tif影像图层级要高
+    zIndex: 2, // TODO: 道路标记层级要比tif影像图层级要高
   });
 
   const map = new Map({
@@ -86,6 +88,19 @@ export function setMapView(config = {}) {
   });
 }
 
+export function addImgLayer(target) {
+  mapStore.clearActiveImgLayer();
+
+  // 创建并显示新的图层
+  const coord = [+target.coordinate.split(",")[0], +target.coordinate.split(",")[1]];
+  const imgLayer = createWMSLayer(target.wmsUrl);
+  mapStore.mapInstance.addLayer(imgLayer);
+  mapStore.setActiveImgLayer(imgLayer);
+  setMapView({
+    center: coord,
+  });
+}
+
 // 设置矢量图层的样式,这里是直接生成一个style对象
 export function getVecLayerStyle() {
   // 需要一个style的store
@@ -132,4 +147,132 @@ export function fillVecLayer(data) {
 
   const extent = vectorSource.getExtent();
   mapStore.mapInstance.getView().fit(extent, { padding: [50, 50, 50, 50], maxZoom: 14 });
+}
+
+// 显示绘制区域矢量:使用addVecToLayer统一替换
+export function showDrawArea(coordinate) {
+  if (!mapStore.activeVecLayer) {
+    const layer = new VectorLayer();
+    layer.setZIndex(10); // 注意图层的index
+    mapStore.setActiveVecLayer(layer);
+  }
+
+  const polygon = new Polygon([coordinate]);
+
+  // 创建 Feature
+  const feature = new Feature({
+    geometry: polygon,
+  });
+
+  const vectorSource = new VectorSource({
+    features: [feature],
+  });
+
+  mapStore.activeVecLayer.setSource(vectorSource);
+}
+
+// 显示解译结果矢量
+export function showResVecArea(geojsonData) {
+  if (!mapStore.activeVecLayer) {
+    const layer = new VectorLayer();
+    layer.setZIndex(10);
+    mapStore.setActiveVecLayer(layer);
+  }
+
+  // === Step 2: 使用 GeoJSON 格式化器解析 features ===
+  const features = new GeoJSON().readFeatures(geojsonData, {
+    dataProjection: "EPSG:4326", // 后端数据一般是 WGS84 经纬度
+    featureProjection: "EPSG:4326", // OpenLayers 默认地图投影
+  });
+
+  const vectorSource = new VectorSource({
+    features: features,
+  });
+  mapStore.activeVecLayer.setSource(vectorSource);
+  mapStore.mapInstance.addLayer(mapStore.activeVecLayer);
+}
+
+// 在已经存在的矢量图层上继续添加矢量，保留之前的矢量
+// geojsonData是GeoJSON格式的FeatureCollection
+export function addVecToLayer(geojsonData) {
+  if (!mapStore.activeVecLayer) {
+    const layer = new VectorLayer();
+    layer.setZIndex(10);
+    mapStore.setActiveVecLayer(layer);
+  }
+
+  const features = handleGeoJSON(geojsonData);
+  // 假设你已经有了 vectorLayer
+  const source = mapStore.activeVecLayer.getSource();
+  // 在数据源上添加新的feature
+  source.addFeatures(features);
+}
+
+/* 
+ 后端返回的GeoJSON数据,顶层可能是Geometry / Feature / FeatureCollection /，这里统一处理
+ data: JSON.parse以后js对象
+ 返回值：Feature[]（OpenLayers 的 Feature 数组）
+*/
+
+export function handleGeoJSON(data) {
+  if (typeof data === "string") {
+    data = JSON.parse(data);
+  }
+
+  let features = [];
+  const geojsonFormat = new GeoJSON();
+
+  switch (data.type) {
+    // 1️⃣ Geometry
+    case "Point":
+    case "LineString":
+    case "Polygon":
+    case "MultiPoint":
+    case "MultiLineString":
+    case "MultiPolygon": {
+      const geom = geojsonFormat.readGeometry(data, {
+        dataProjection: "EPSG:4326", // 后端数据一般是 WGS84 经纬度
+        featureProjection: "EPSG:4326", // OpenLayers 默认地图投影
+      });
+      features.push(new Feature({ geometry: geom }));
+      break;
+    }
+
+    // 2️⃣ Feature
+    case "Feature": {
+      features = geojsonFormat.readFeatures(data, {
+        dataProjection: "EPSG:4326", // 后端数据一般是 WGS84 经纬度
+        featureProjection: "EPSG:4326", // OpenLayers 默认地图投影
+      });
+      break;
+    }
+
+    // 3️⃣ FeatureCollection
+    case "FeatureCollection": {
+      features = geojsonFormat.readFeatures(data, {
+        dataProjection: "EPSG:4326", // 后端数据一般是 WGS84 经纬度
+        featureProjection: "EPSG:4326", // OpenLayers 默认地图投影
+      });
+      break;
+    }
+
+    // 4️⃣ GeometryCollection
+    case "GeometryCollection": {
+      // GeometryCollection 是几何的集合，需要逐个转成 Feature
+      data.geometries.forEach((geomData) => {
+        const geom = geojsonFormat.readGeometry(geomData, {
+          dataProjection: "EPSG:4326", // 后端数据一般是 WGS84 经纬度
+          featureProjection: "EPSG:4326", // OpenLayers 默认地图投影
+        });
+        features.push(new Feature({ geometry: geom }));
+      });
+      break;
+    }
+
+    default: {
+      console.warn("不支持的 GeoJSON 类型：", data.type);
+    }
+  }
+
+  return features;
 }
