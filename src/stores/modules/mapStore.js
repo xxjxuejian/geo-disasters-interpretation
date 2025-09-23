@@ -1,5 +1,7 @@
 import { shallowRef } from "vue";
 import VectorLayer from "ol/layer/Vector";
+import VectorSource from "ol/source/Vector";
+import { createWMSLayer, getVecLayerStyle } from "@/gis/mapTools.js";
 import pinia from "../index";
 
 export const useMapStore = defineStore("map", () => {
@@ -20,20 +22,40 @@ export const useMapStore = defineStore("map", () => {
     activeImgLayer.value = layer;
   }
 
+  // 移除当前激活的影像图层
+  function clearActiveImgLayer() {
+    if (mapInstance.value && activeImgLayer.value) {
+      mapInstance.value.removeLayer(activeImgLayer.value);
+    }
+    activeImgLayer.value = null;
+  }
+
+  // 在地图上添加一个新的影像图层
+  function addNewImgLayer(wmsUrl = "LYN:LPQ3857") {
+    if (!mapInstance.value) return;
+    const newLayer = createWMSLayer(wmsUrl);
+    mapInstance.value.addLayer(newLayer);
+    setActiveImgLayer(newLayer);
+  }
+
   // 保存当前激活矢量图层
   function setActiveVecLayer(layer) {
-    activeVecLayer.value = layer;
+    if (mapInstance.value) {
+      activeVecLayer.value = layer;
+    }
   }
 
   // 重置矢量图层
   function resetActiveVectorLayer() {
     // 如果图层存在就清除数据源
     if (activeVecLayer.value) {
-      activeVecLayer.value.getSource().clear();
+      activeVecLayer.value.getSource()?.clear();
     }
     // 如果图层不存在就创建
     else {
+      const vectorSource = new VectorSource();
       const vecLayer = new VectorLayer({
+        source: vectorSource,
         zIndex: 10,
       });
       mapInstance.value.addLayer(vecLayer);
@@ -42,12 +64,37 @@ export const useMapStore = defineStore("map", () => {
     console.log("重置矢量图层");
   }
 
-  // 移除当前激活的影像图层
-  function clearActiveImgLayer() {
-    if (activeImgLayer.value) {
-      mapInstance.value.removeLayer(activeImgLayer.value);
+  function setVecLayerStyle() {
+    if (activeVecLayer.value) {
+      activeVecLayer.value.setStyle(getVecLayerStyle());
     }
-    activeImgLayer.value = null;
+  }
+
+  function addFeature(feature) {
+    activeVecLayer.value.getSource()?.addFeature(feature);
+  }
+
+  function addFeatures(features) {
+    activeVecLayer.value.getSource()?.addFeatures(features);
+  }
+
+  // 切换视角,限定config类型
+  function flyTo(config = {}) {
+    if (!mapInstance.value) return;
+    const view = mapInstance.value.getView();
+    view.animate({
+      ...config,
+      zoom: 15,
+      rotation: undefined,
+      duration: 1500,
+    });
+  }
+
+  function flyToVec() {
+    if (activeVecLayer.value) {
+      const extent = activeVecLayer.value.getSource().getExtent();
+      mapInstance.value.getView().fit(extent, { padding: [50, 50, 50, 50], maxZoom: 14 });
+    }
   }
 
   return {
@@ -57,8 +104,14 @@ export const useMapStore = defineStore("map", () => {
     setMapInstance,
     setActiveImgLayer,
     clearActiveImgLayer,
+    addNewImgLayer,
     setActiveVecLayer,
     resetActiveVectorLayer,
+    setVecLayerStyle,
+    flyTo,
+    flyToVec,
+    addFeature,
+    addFeatures,
   };
 });
 

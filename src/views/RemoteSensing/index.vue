@@ -4,14 +4,17 @@ import DataInput from "./SideBar/DataInput/index.vue";
 import Interpretation from "./SideBar/Interpretation/index.vue";
 import DataOutput from "./SideBar/DataOutput/index.vue";
 import MAP from "./Map/index.vue";
+import { useMapStore } from "@/stores/modules/mapStore";
 
+const mapStore = useMapStore();
 const activeSidebar = ref("data-output"); // 控制当前显示的侧边栏内容
-const isImageLayerVisible = ref(true); // 影像图层可见性状态
-const isVectorLayerVisible = ref(true); // 矢量图层可见性状态
 
 // 导航栏点击事件处理函数
 const handleNavigation = (sidebarName) => {
   activeSidebar.value = sidebarName;
+
+  mapStore.clearActiveImgLayer();
+  mapStore.resetActiveVectorLayer();
 };
 </script>
 

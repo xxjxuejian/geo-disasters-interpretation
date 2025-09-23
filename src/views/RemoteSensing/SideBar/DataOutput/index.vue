@@ -3,8 +3,9 @@ import { getIoResultListApi } from "@/api/ioresult";
 import { getImgInfoApi } from "@/api/image";
 import { getResultInfoApi } from "@/api/result";
 import { getVectorInfoApi } from "@/api/vector";
+import { handleGeoJSONToFeatures, coordinateToFeature } from "@/gis/mapTools";
 
-import { addImgLayer, showDrawArea, showResVecArea, addVecToLayer } from "@/composables/mapOptions";
+import { addImgLayer, showDrawArea, addVecToLayer } from "@/composables/mapOptions";
 import { ElMessage } from "element-plus";
 import { useMapStore } from "@/stores/modules/mapStore";
 
@@ -15,29 +16,39 @@ async function getIoResultList() {
   const res = await getIoResultListApi();
   ioResultList.value = res.data.filter((item) => item.isShare);
   ioResultList.value.forEach((item) => {
+    // 控制是否展开
     item.isExpand = false;
+    // 控制是否显示影像图
+    item.isShowImg = false;
+    // 控制是否显示绘制区域
+    item.isShowDrawArea = false;
+    // 控制是否显示解译矢量区域
+    item.isShowResVec = false;
   });
   console.log("数据输出列表", ioResultList.value);
 }
 
 getIoResultList();
 
+// 保存三个图层
+let imgLayerInfo;
+let drawAreaFeature;
+let resVecAreaFeatures;
 // 点击某一个输出结果
 const handleIOClick = async (item) => {
+  let prevIsExpand = item.isExpand;
   ioResultList.value.forEach((ele) => {
-    if (item.id !== ele.id) {
-      ele.isExpand = false;
-    }
+    ele.isExpand = false;
+    ele.isShowImg = false;
+    ele.isShowDrawArea = false;
+    ele.isShowResVec = false;
   });
+  item.isExpand = prevIsExpand;
 
   if (item.status === 3) {
     ElMessage.error("数据处理失败，请重新处理！");
     return;
   }
-
-  // 2. 展示绘制的矢量区域
-  // const vec = await getVectorInfoApi(res.data.vectorId);
-  // console.log("矢量信息", vec);
 
   mapStore.clearActiveImgLayer();
   mapStore.resetActiveVectorLayer();
@@ -45,28 +56,84 @@ const handleIOClick = async (item) => {
   // 如果已经展开，就收起
   if (item.isExpand) {
     item.isExpand = false;
+    item.isShowImg = false;
+    item.isShowDrawArea = false;
+    item.isShowResVec = false;
+    imgLayerInfo = null;
+    drawAreaFeature = null;
+    resVecAreaFeatures = null;
+    console.log("1111111111111111111111111");
   }
   // 未展开就展开
   else {
     item.isExpand = true;
+    item.isShowImg = true;
+    item.isShowDrawArea = true;
+    item.isShowResVec = true;
 
     // 调用一次这个才能拿到下面的各种id数据
     const res = await getResultInfoApi(item.id);
     console.log("解译结果", res);
 
     // 展示影像地图
+    mapStore.clearActiveImgLayer();
     const img = await getImgInfoApi(item.imageId);
     console.log("影像信息", img);
-    addImgLayer(img.data);
+    imgLayerInfo = img.data;
+    const { coordinate, wmsUrl } = img.data;
+    const coords = [+coordinate.split(",")[0], +coordinate.split(",")[1]];
+    mapStore.addNewImgLayer(wmsUrl);
+    mapStore.flyTo({
+      center: coords,
+    });
+    // addImgLayer(img.data);
 
     const drawArea = JSON.parse(res.data.drawArea);
     console.log("绘制区域", drawArea);
-    showDrawArea(drawArea);
+    const feature = coordinateToFeature("Polygon", drawArea);
+    mapStore.addFeature(feature);
+    // drawAreaFeature = showDrawArea(drawArea);
 
-    // const resArea = JSON.parse(res.data.geom);
     const resArea = res.data.geom;
     // console.log("解译结果矢量", resArea);
-    addVecToLayer(resArea);
+    // resVecAreaFeatures = addVecToLayer(resArea);
+    const features = handleGeoJSONToFeatures(resArea);
+    mapStore.addFeatures(features);
+  }
+};
+
+const handleImgClick = (item) => {
+  console.log("aaaaaaaa", item);
+  if (item.isShowImg) {
+    mapStore.clearActiveImgLayer();
+    item.isShowImg = false;
+  } else {
+    addImgLayer(imgLayerInfo);
+    item.isShowImg = true;
+  }
+};
+
+const handleDrawAreaClick = (item) => {
+  const vecSource = mapStore.activeVecLayer.getSource();
+  console.log("bbbbbbbbb", item);
+  if (item.isShowDrawArea) {
+    vecSource.removeFeature(drawAreaFeature);
+    item.isShowDrawArea = false;
+  } else {
+    item.isShowDrawArea = true;
+    vecSource.addFeature(drawAreaFeature);
+  }
+};
+
+const handleResVecClick = (item) => {
+  const vecSource = mapStore.activeVecLayer.getSource();
+  console.log("ccccccccc", item);
+  if (item.isShowResVec) {
+    item.isShowResVec = false;
+    vecSource.removeFeatures(resVecAreaFeatures);
+  } else {
+    item.isShowResVec = true;
+    vecSource.addFeatures(resVecAreaFeatures);
   }
 };
 </script>
@@ -111,26 +178,26 @@ const handleIOClick = async (item) => {
         <div v-if="item.isExpand" class="sub-list">
           <div class="sub-item">
             <div class="flex-y-center">
-              <div class="flex-y-center cursor-pointer">
-                <el-icon class="mr-2 cursor-pointer"><View /></el-icon>
-                <!-- <el-icon class="mr-2 cursor-pointer"><Hide /></el-icon> -->
+              <div class="flex-y-center cursor-pointer" @click="handleImgClick(item)">
+                <el-icon v-if="item.isShowImg" class="mr-2 cursor-pointer"><View /></el-icon>
+                <el-icon v-else class="mr-2 cursor-pointer"><Hide /></el-icon>
               </div>
               <div>{{ item.imageName }}</div>
             </div>
             <div class="cursor-pointer">...</div>
           </div>
           <div class="sub-item">
-            <div class="flex-y-center">
-              <el-icon class="mr-2 cursor-pointer"><View /></el-icon>
-              <!-- <el-icon class="mr-2 cursor-pointer"><Hide /></el-icon> -->
+            <div class="flex-y-center" @click="handleDrawAreaClick(item)">
+              <el-icon v-if="item.isShowDrawArea" class="mr-2 cursor-pointer"><View /></el-icon>
+              <el-icon v-else class="mr-2 cursor-pointer"><Hide /></el-icon>
               <div>{{ item.areaName }}</div>
             </div>
             <div class="cursor-pointer">...</div>
           </div>
           <div class="sub-item">
-            <div class="flex-y-center">
-              <el-icon class="mr-2 cursor-pointer"><View /></el-icon>
-              <!-- <el-icon class="mr-2 cursor-pointer"><Hide /></el-icon> -->
+            <div class="flex-y-center" @click="handleResVecClick(item)">
+              <el-icon v-if="item.isShowResVec" class="mr-2 cursor-pointer"><View /></el-icon>
+              <el-icon v-else class="mr-2 cursor-pointer"><Hide /></el-icon>
               <div>{{ item.name }}</div>
             </div>
             <div class="cursor-pointer">...</div>
@@ -148,7 +215,7 @@ const handleIOClick = async (item) => {
       display: flex;
       gap: 12px;
       align-items: center;
-      height: 60px;
+      height: 90px;
       padding: 16px 0;
       margin-bottom: 8px;
       cursor: pointer;

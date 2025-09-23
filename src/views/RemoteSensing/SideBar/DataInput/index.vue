@@ -1,14 +1,9 @@
 <script setup>
 import { getVectorListApi, getVectorDetailApi } from "@/api/vector.js";
 import { getImgMapListApi } from "@/api/image.js";
-
+import { arrDataToFeatures } from "@/gis/mapTools.js";
 import { useMapStore } from "@/stores/modules/mapStore";
 import { createWMSLayer, setMapView, fillVecLayer } from "@/composables/mapOptions.js";
-import GeoJSON from "ol/format/GeoJSON.js";
-
-import VectorSource from "ol/source/Vector.js";
-import VectorLayer from "ol/layer/Vector.js";
-import { Style, Fill, Stroke, Circle as CircleStyle } from "ol/style.js";
 
 const mapStore = useMapStore();
 const dataList = ref([]); // 存储影像和矢量数据的列表
@@ -76,11 +71,10 @@ function toggleImgLayer(curLayer) {
     curLayer.isShow = true;
 
     // 创建并显示新的图层
+    mapStore.addNewImgLayer(curLayer.wmsUrl);
+
     const coord = [+curLayer.coordinate.split(",")[0], +curLayer.coordinate.split(",")[1]];
-    const layer = createWMSLayer(curLayer.wmsUrl);
-    mapStore.mapInstance.addLayer(layer);
-    mapStore.setActiveImgLayer(layer);
-    setMapView({
+    mapStore.flyTo({
       center: coord,
     });
   }
@@ -90,7 +84,6 @@ function toggleImgLayer(curLayer) {
 async function getVecDetail(id) {
   try {
     const res = await getVectorDetailApi({ vectorId: id });
-
     const data = res.data.map((item) => {
       return {
         ...item,
@@ -115,7 +108,14 @@ async function toggleVectorLayer(curLayer) {
     // 显示,就创建图层
     const id = curLayer.id;
     const data = await getVecDetail(id);
-    fillVecLayer(data);
+    const features = arrDataToFeatures(data);
+    mapStore.addFeatures(features);
+    mapStore.setVecLayerStyle();
+    mapStore.flyToVec();
+    // mapStore.activeVecLayer.setStyle(getVecLayerStyle());
+    // const extent = vectorSource.getExtent();
+    // mapStore.mapInstance.getView().fit(extent, { padding: [50, 50, 50, 50], maxZoom: 14 });
+    // fillVecLayer(data);
     curLayer.isShow = true;
   }
 }

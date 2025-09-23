@@ -18,6 +18,7 @@ const emit = defineEmits(["navigate"]);
   gap: 32px;
   align-items: center;
   justify-content: center;
+  height: 70px;
   padding: 10px;
   background-color: #f8f9fa;
   border-bottom: 1px solid #dee2e6;

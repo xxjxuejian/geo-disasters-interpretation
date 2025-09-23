@@ -9,7 +9,7 @@ import mapUrls from "@/gis/mapUrls";
 import VectorLayer from "ol/layer/Vector";
 import VectorSource from "ol/source/Vector";
 import GeoJSON from "ol/format/GeoJSON.js";
-import { Style, Fill, Stroke, Circle as CircleStyle } from "ol/style.js";
+import { Style, Fill, Stroke } from "ol/style.js";
 import Feature from "ol/Feature";
 import Polygon from "ol/geom/Polygon";
 
@@ -19,6 +19,7 @@ const mapStore = useMapStoreHook();
 export function initMap(mapEl) {
   if (!mapEl || mapStore.mapInstance) return;
 
+  // 影像底图
   const baseImgLayer = new TileLayer({
     source: new XYZ({
       url: mapUrls["tian-img"],
@@ -27,7 +28,7 @@ export function initMap(mapEl) {
     zIndex: 1,
   });
 
-  // 2.1 添加影像地图的注记
+  // 2.1 添加影像底图的注记
   const labelLayer = new TileLayer({
     source: new XYZ({
       url: mapUrls["tian-label"],
@@ -36,9 +37,17 @@ export function initMap(mapEl) {
     zIndex: 2, // TODO: 道路标记层级要比tif影像图层级要高
   });
 
+  // 创建矢量图层,供后续使用
+  const vectorSource = new VectorSource();
+  const vectorLayer = new VectorLayer({
+    source: vectorSource,
+    zIndex: 10,
+  });
+  mapStore.setActiveVecLayer(vectorLayer);
+
   const map = new Map({
     target: mapEl,
-    layers: [baseImgLayer, labelLayer],
+    layers: [baseImgLayer, labelLayer, vectorLayer],
     view: new View({
       projection: "EPSG:4326",
       center: [0, 0],
@@ -149,7 +158,7 @@ export function fillVecLayer(data) {
   mapStore.mapInstance.getView().fit(extent, { padding: [50, 50, 50, 50], maxZoom: 14 });
 }
 
-// 显示绘制区域矢量:使用addVecToLayer统一替换
+// 显示绘制区域矢量
 export function showDrawArea(coordinate) {
   if (!mapStore.activeVecLayer) {
     const layer = new VectorLayer();
@@ -169,6 +178,7 @@ export function showDrawArea(coordinate) {
   });
 
   mapStore.activeVecLayer.setSource(vectorSource);
+  return feature;
 }
 
 // 显示解译结果矢量
@@ -189,7 +199,7 @@ export function showResVecArea(geojsonData) {
     features: features,
   });
   mapStore.activeVecLayer.setSource(vectorSource);
-  mapStore.mapInstance.addLayer(mapStore.activeVecLayer);
+  return features;
 }
 
 // 在已经存在的矢量图层上继续添加矢量，保留之前的矢量
@@ -206,6 +216,7 @@ export function addVecToLayer(geojsonData) {
   const source = mapStore.activeVecLayer.getSource();
   // 在数据源上添加新的feature
   source.addFeatures(features);
+  return features;
 }
 
 /* 
@@ -213,7 +224,6 @@ export function addVecToLayer(geojsonData) {
  data: JSON.parse以后js对象
  返回值：Feature[]（OpenLayers 的 Feature 数组）
 */
-
 export function handleGeoJSON(data) {
   if (typeof data === "string") {
     data = JSON.parse(data);
@@ -274,5 +284,6 @@ export function handleGeoJSON(data) {
     }
   }
 
+  console.log("feature Collections", features);
   return features;
 }
