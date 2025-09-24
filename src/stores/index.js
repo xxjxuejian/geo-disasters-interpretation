@@ -7,6 +7,6 @@ export function setupPinia(app) {
   app.use(pinia);
 }
 
-export * from "./modules/counter";
+export * from "./modules/mapStore";
 
 export default pinia;

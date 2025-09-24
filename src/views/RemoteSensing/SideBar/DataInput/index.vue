@@ -3,7 +3,6 @@ import { getVectorListApi, getVectorDetailApi } from "@/api/vector.js";
 import { getImgMapListApi } from "@/api/image.js";
 import { arrDataToFeatures } from "@/gis/mapTools.js";
 import { useMapStore } from "@/stores/modules/mapStore";
-import { createWMSLayer, setMapView, fillVecLayer } from "@/composables/mapOptions.js";
 
 const mapStore = useMapStore();
 const dataList = ref([]); // 存储影像和矢量数据的列表
@@ -112,10 +111,7 @@ async function toggleVectorLayer(curLayer) {
     mapStore.addFeatures(features);
     mapStore.setVecLayerStyle();
     mapStore.flyToVec();
-    // mapStore.activeVecLayer.setStyle(getVecLayerStyle());
-    // const extent = vectorSource.getExtent();
-    // mapStore.mapInstance.getView().fit(extent, { padding: [50, 50, 50, 50], maxZoom: 14 });
-    // fillVecLayer(data);
+
     curLayer.isShow = true;
   }
 }

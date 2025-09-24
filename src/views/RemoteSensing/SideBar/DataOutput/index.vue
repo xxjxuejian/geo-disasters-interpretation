@@ -2,10 +2,7 @@
 import { getIoResultListApi } from "@/api/ioresult";
 import { getImgInfoApi } from "@/api/image";
 import { getResultInfoApi } from "@/api/result";
-import { getVectorInfoApi } from "@/api/vector";
 import { handleGeoJSONToFeatures, coordinateToFeature } from "@/gis/mapTools";
-
-import { addImgLayer, showDrawArea, addVecToLayer } from "@/composables/mapOptions";
 import { ElMessage } from "element-plus";
 import { useMapStore } from "@/stores/modules/mapStore";
 
@@ -91,31 +88,39 @@ const handleIOClick = async (item) => {
     const drawArea = JSON.parse(res.data.drawArea);
     console.log("绘制区域", drawArea);
     const feature = coordinateToFeature("Polygon", drawArea);
+    drawAreaFeature = feature;
     mapStore.addFeature(feature);
     // drawAreaFeature = showDrawArea(drawArea);
 
     const resArea = res.data.geom;
     // console.log("解译结果矢量", resArea);
-    // resVecAreaFeatures = addVecToLayer(resArea);
+
     const features = handleGeoJSONToFeatures(resArea);
+    resVecAreaFeatures = features;
     mapStore.addFeatures(features);
   }
 };
 
 const handleImgClick = (item) => {
-  console.log("aaaaaaaa", item);
+  console.log("toggle img layer", item);
   if (item.isShowImg) {
     mapStore.clearActiveImgLayer();
     item.isShowImg = false;
   } else {
-    addImgLayer(imgLayerInfo);
+    mapStore.clearActiveImgLayer();
+    const { coordinate, wmsUrl } = imgLayerInfo;
+    const coords = [+coordinate.split(",")[0], +coordinate.split(",")[1]];
+    mapStore.addNewImgLayer(wmsUrl);
+    mapStore.flyTo({
+      center: coords,
+    });
     item.isShowImg = true;
   }
 };
 
 const handleDrawAreaClick = (item) => {
   const vecSource = mapStore.activeVecLayer.getSource();
-  console.log("bbbbbbbbb", item);
+  console.log("paint draw area", item);
   if (item.isShowDrawArea) {
     vecSource.removeFeature(drawAreaFeature);
     item.isShowDrawArea = false;
@@ -127,7 +132,7 @@ const handleDrawAreaClick = (item) => {
 
 const handleResVecClick = (item) => {
   const vecSource = mapStore.activeVecLayer.getSource();
-  console.log("ccccccccc", item);
+  console.log("paint res vecArea", item);
   if (item.isShowResVec) {
     item.isShowResVec = false;
     vecSource.removeFeatures(resVecAreaFeatures);
