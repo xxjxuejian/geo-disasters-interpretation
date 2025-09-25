@@ -1,8 +1,11 @@
 <script setup>
 import { getVectorListApi, getVectorDetailApi } from "@/api/vector.js";
 import { getImgMapListApi } from "@/api/image.js";
-import { arrDataToFeatures } from "@/gis/mapTools.js";
+import { arrDataToFeatures } from "@/gis/geojsonUtils";
 import { useMapStore } from "@/stores/modules/mapStore";
+import { flyTo, flyToVec } from "@/gis/mapService.js";
+import { addNewImgLayer } from "@/gis/layerFactory.js";
+import { getVectorLayerStyle } from "@/gis/styleUtils.js";
 
 const mapStore = useMapStore();
 const dataList = ref([]); // 存储影像和矢量数据的列表
@@ -49,6 +52,24 @@ async function getDataList() {
 }
 getDataList();
 
+// 获取矢量数据详情
+async function getVecDetail(id) {
+  try {
+    const res = await getVectorDetailApi({ vectorId: id });
+    const data = res.data.map((item) => {
+      return {
+        ...item,
+        gemo: JSON.parse(JSON.parse(item.gjson).the_geom),
+      };
+    });
+    console.log("vec detail", data);
+    return data;
+  } catch (err) {
+    console.error("获取矢量详情失败", err);
+    return []; // 兜底
+  }
+}
+
 // 影像图层的显示与隐藏
 function toggleImgLayer(curLayer) {
   // 当前图层显示,就隐藏
@@ -70,30 +91,12 @@ function toggleImgLayer(curLayer) {
     curLayer.isShow = true;
 
     // 创建并显示新的图层
-    mapStore.addNewImgLayer(curLayer.wmsUrl);
+    addNewImgLayer(curLayer.wmsUrl);
 
     const coord = [+curLayer.coordinate.split(",")[0], +curLayer.coordinate.split(",")[1]];
-    mapStore.flyTo({
+    flyTo({
       center: coord,
     });
-  }
-}
-
-// 获取矢量数据详情
-async function getVecDetail(id) {
-  try {
-    const res = await getVectorDetailApi({ vectorId: id });
-    const data = res.data.map((item) => {
-      return {
-        ...item,
-        gemo: JSON.parse(JSON.parse(item.gjson).the_geom),
-      };
-    });
-    console.log("vec detail", data);
-    return data;
-  } catch (err) {
-    console.error("获取矢量详情失败", err);
-    return []; // 兜底
   }
 }
 
@@ -109,8 +112,9 @@ async function toggleVectorLayer(curLayer) {
     const data = await getVecDetail(id);
     const features = arrDataToFeatures(data);
     mapStore.addFeatures(features);
-    mapStore.setVecLayerStyle();
-    mapStore.flyToVec();
+    const newStyle = getVectorLayerStyle();
+    mapStore.activeVecLayer.setStyle(newStyle);
+    flyToVec();
 
     curLayer.isShow = true;
   }

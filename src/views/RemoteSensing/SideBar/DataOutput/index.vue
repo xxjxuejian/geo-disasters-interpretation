@@ -2,9 +2,11 @@
 import { getIoResultListApi } from "@/api/ioresult";
 import { getImgInfoApi } from "@/api/image";
 import { getResultInfoApi } from "@/api/result";
-import { handleGeoJSONToFeatures, coordinateToFeature } from "@/gis/mapTools";
+import { geojsonToFeatures, coordinateToFeature } from "@/gis/geojsonUtils.js";
 import { ElMessage } from "element-plus";
 import { useMapStore } from "@/stores/modules/mapStore";
+import { flyTo } from "@/gis/mapService.js";
+import { addNewImgLayer } from "@/gis/layerFactory.js";
 
 const mapStore = useMapStore();
 
@@ -79,23 +81,21 @@ const handleIOClick = async (item) => {
     imgLayerInfo = img.data;
     const { coordinate, wmsUrl } = img.data;
     const coords = [+coordinate.split(",")[0], +coordinate.split(",")[1]];
-    mapStore.addNewImgLayer(wmsUrl);
-    mapStore.flyTo({
+    addNewImgLayer(wmsUrl);
+    flyTo({
       center: coords,
     });
-    // addImgLayer(img.data);
 
     const drawArea = JSON.parse(res.data.drawArea);
     console.log("绘制区域", drawArea);
     const feature = coordinateToFeature("Polygon", drawArea);
     drawAreaFeature = feature;
     mapStore.addFeature(feature);
-    // drawAreaFeature = showDrawArea(drawArea);
 
     const resArea = res.data.geom;
     // console.log("解译结果矢量", resArea);
 
-    const features = handleGeoJSONToFeatures(resArea);
+    const features = geojsonToFeatures(resArea);
     resVecAreaFeatures = features;
     mapStore.addFeatures(features);
   }
@@ -110,8 +110,9 @@ const handleImgClick = (item) => {
     mapStore.clearActiveImgLayer();
     const { coordinate, wmsUrl } = imgLayerInfo;
     const coords = [+coordinate.split(",")[0], +coordinate.split(",")[1]];
-    mapStore.addNewImgLayer(wmsUrl);
-    mapStore.flyTo({
+    addNewImgLayer(wmsUrl);
+
+    flyTo({
       center: coords,
     });
     item.isShowImg = true;

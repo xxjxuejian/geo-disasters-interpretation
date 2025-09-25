@@ -11,6 +11,7 @@ const activeSidebar = ref("inter-toolbox"); // 控制当前显示的侧边栏内
 
 // 导航栏点击事件处理函数
 const handleNavigation = (sidebarName) => {
+  if (activeSidebar.value === sidebarName) return;
   activeSidebar.value = sidebarName;
 
   mapStore.clearActiveImgLayer();

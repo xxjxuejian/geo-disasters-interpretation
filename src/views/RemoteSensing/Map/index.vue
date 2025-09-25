@@ -3,7 +3,7 @@
 <script setup>
 import { onMounted, ref } from "vue";
 import { useMapStore } from "@/stores/modules/mapStore";
-// import { initMap } from "@/composables/mapOptions";
+import { flyTo } from "@/gis/mapService.js";
 
 import mapUrls from "@/gis/mapUrls";
 import Map from "ol/Map";
@@ -57,7 +57,7 @@ function initMap(mapEl) {
   mapStore.setMapInstance(map);
   mapStore.setActiveVecLayer(vectorLayer);
 
-  mapStore.flyTo({
+  flyTo({
     center: [120.25, 30.4],
   });
 }

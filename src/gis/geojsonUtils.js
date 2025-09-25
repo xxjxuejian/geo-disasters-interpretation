@@ -1,14 +1,11 @@
 import Feature from "ol/Feature";
 import GeoJSON from "ol/format/GeoJSON.js";
-import TileLayer from "ol/layer/Tile";
-import TileWMS from "ol/source/TileWMS";
-import { Style, Fill, Stroke } from "ol/style.js";
-/* 
- 后端返回的GeoJSON数据,顶层可能是Geometry / Feature / FeatureCollection /，这里统一处理
- data: GeoJSON数据
- 返回值：Feature[]（OpenLayers 的 Feature 数组）
-*/
-export function handleGeoJSONToFeatures(data) {
+
+/**
+ * 将 GeoJSON 数据转换为 Feature 数组
+ * 支持 Geometry / Feature / FeatureCollection / GeometryCollection
+ */
+export function geojsonToFeatures(data) {
   if (typeof data === "string") {
     data = JSON.parse(data);
   }
@@ -72,6 +69,10 @@ export function handleGeoJSONToFeatures(data) {
   return features;
 }
 
+/**
+ * 将数组数据转换为 Feature
+ * @param {Array} data - 包含 gemo 属性的数据数组
+ */
 export function arrDataToFeatures(data) {
   const geojsonFormat = new GeoJSON();
 
@@ -90,7 +91,11 @@ export function arrDataToFeatures(data) {
   return features;
 }
 
-// 只针对多边形Polygon
+/**
+ * 将坐标数组转成 Feature
+ * @param {string} type - Geometry 类型（Polygon / Point / LineString）
+ * @param {Array} coordinate - 坐标数组
+ */
 export function coordinateToFeature(type = "Polygon", coordinate) {
   const geojsonFormat = new GeoJSON();
   const feature = geojsonFormat.readFeature(
@@ -107,38 +112,4 @@ export function coordinateToFeature(type = "Polygon", coordinate) {
     }
   );
   return feature;
-}
-
-export function createWMSLayer(wmsUrl = "LYN:LPQ3857") {
-  let layer = new TileLayer({
-    source: new TileWMS({
-      url: "http://192.168.1.253:8080/geoserver/wms/",
-      params: {
-        VERSION: "1.1.0",
-        REQUEST: "GetMap",
-        layers: wmsUrl, // LYN:linping_16db,(地名标记)  LYN:LPQ3857,LYN:lp_water,LYN:osm_lp,LYN:lp_vegetatin
-      },
-      crossOrigin: "anonymous",
-      serverType: "geoserver",
-    }),
-    zIndex: 5,
-  });
-
-  return layer;
-}
-
-// 设置矢量图层的样式,这里是直接生成一个style对象
-export function getVecLayerStyle() {
-  // 需要一个style的store
-  const newStyle = new Style({
-    fill: new Fill({
-      color: "rgba(49, 48, 48, 0.2)", // 填充颜色，支持透明度
-    }),
-    stroke: new Stroke({
-      color: "#f50f0fff", // 描边颜色
-      width: 2, // 描边宽度
-      lineDash: [10, 5], // 描边虚线：10像素实线 + 5像素空白
-    }),
-  });
-  return newStyle;
 }
