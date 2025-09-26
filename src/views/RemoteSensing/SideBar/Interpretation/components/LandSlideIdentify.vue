@@ -3,12 +3,8 @@ import { getImgMapListApi } from "@/api/image.js";
 import { useMapStore } from "@/stores/modules/mapStore";
 import { flyTo } from "@/gis/mapService.js";
 import { addNewImgLayer } from "@/gis/layerFactory.js";
-import { Draw, Modify, Snap, Select } from "ol/interaction.js";
-import { click } from "ol/events/condition.js";
-import { Style, Stroke } from "ol/style.js";
-import { onMounted } from "vue";
 import GeoJSON from "ol/format/GeoJSON.js";
-import { ElMessage } from "element-plus";
+import { useDraw } from "@/composables/useDraw";
 
 const emit = defineEmits(["back"]);
 const imgList = ref([]);
@@ -20,7 +16,17 @@ const formData = ref({
   imgId: "",
   drawArea: [],
 });
-const isDrawing = ref(false); // 是否正在绘制
+
+const { mapInstance, activeVecSource } = storeToRefs(mapStore);
+const {
+  isDrawing,
+  addInteraction,
+  startDraw,
+  cancelDraw,
+  removeAllInteractions,
+  clearAllFeatures,
+  deleteSelectedFeatures,
+} = useDraw(mapInstance, activeVecSource);
 
 // 获取影像数据列表
 async function getImgMapList() {
@@ -61,130 +67,26 @@ const handleStartDraw = () => {
     ElMessage.error("请选择影像数据");
     return;
   }
-  isDrawing.value = true;
-  draw();
+  startDraw();
 };
 
-// 2. 定义 draw 变量（后续添加/移除用）
-let drawInteraction = null;
-let modifyInteraction = null;
-let snapInteraction = null;
-let selectInteraction = null; // 删除交互
-
-function addInteraction() {
-  // ========== 选择交互（高亮） ==========
-  selectInteraction = new Select({
-    condition: click,
-    style: new Style({
-      stroke: new Stroke({
-        color: "blue",
-        width: 3,
-      }),
-    }),
-  });
-  mapStore.mapInstance.addInteraction(selectInteraction);
-
-  // ========== 监听选择事件 ==========
-  selectInteraction.on("select", (evt) => {
-    if (evt.selected.length > 0) {
-      console.log("选中了多边形:", evt.selected[0]);
-    }
-
-    console.log("选中的矢量", selectInteraction.getFeatures());
-    console.log("编辑实例", modifyInteraction);
-  });
-
-  // ========== 修改交互（基于选择） ==========
-  modifyInteraction = new Modify({
-    features: selectInteraction.getFeatures(), // 只允许修改选中的要素
-  });
-  mapStore.mapInstance.addInteraction(modifyInteraction);
-
-  modifyInteraction.on("modifyend", (evt) => {
-    evt.features.forEach((f) => {
-      console.log("被修改的要素:", f);
-      console.log("modifyend 绘制完成的多边形：", evt);
-    });
-  });
-}
-
-// 移除所有交互，避免冲突
-function clearInteractions() {
-  if (drawInteraction) {
-    mapStore.mapInstance.removeInteraction(drawInteraction);
-    drawInteraction = null;
-    isDrawing.value = false;
-  }
-  if (modifyInteraction) {
-    mapStore.mapInstance.removeInteraction(modifyInteraction);
-    modifyInteraction = null;
-  }
-  if (snapInteraction) {
-    mapStore.mapInstance.removeInteraction(snapInteraction);
-    snapInteraction = null;
-  }
-}
-
-function draw() {
-  const vectorSource = mapStore.getActiveVecSource();
-  // 绘制
-  drawInteraction = new Draw({
-    source: vectorSource,
-    type: "Polygon",
-  });
-  mapStore.mapInstance.addInteraction(drawInteraction);
-
-  // 吸附
-  snapInteraction = new Snap({ source: vectorSource });
-  mapStore.mapInstance.addInteraction(snapInteraction);
-
-  drawInteraction.on("drawstart", () => {
-    console.log("开始绘制");
-  });
-  drawInteraction.on("drawend", (evt) => {
-    const geometry = evt.feature.getGeometry();
-    console.log("drawend 绘制完成的多边形：", evt);
-    console.log("drawend 绘制完成的多边形坐标：", geometry.getCoordinates());
-    if (drawInteraction) {
-      mapStore.mapInstance.removeInteraction(drawInteraction);
-      drawInteraction = null;
-      isDrawing.value = false;
-    }
-  });
-}
-
 const handleCancel = () => {
-  if (drawInteraction) {
-    mapStore.mapInstance.removeInteraction(drawInteraction);
-    drawInteraction = null;
-    isDrawing.value = false;
-  }
+  cancelDraw();
 };
 
 // 清除之前所有的绘制
-const handleClear = () => {
-  clearInteractions();
-  const vectorSource = mapStore.getActiveVecSource();
-  vectorSource.clear();
+const handleClearFeatures = () => {
+  clearAllFeatures();
 };
 
 // 删除图形
-const handleDelVec = () => {
-  if (drawInteraction) {
-    mapStore.mapInstance.removeInteraction(drawInteraction);
-    drawInteraction = null;
-    isDrawing.value = false;
-  }
-  const selectedFeatures = selectInteraction.getFeatures();
-
-  if (selectedFeatures.getLength() > 0) {
-    selectedFeatures.forEach((f) => {
-      mapStore.getActiveVecSource().removeFeature(f);
-    });
-    selectedFeatures.clear();
-    ElMessage.success("删除成功");
+const handleDelFeature = () => {
+  cancelDraw();
+  const result = deleteSelectedFeatures();
+  if (result.success) {
+    ElMessage.success(result.message);
   } else {
-    ElMessage.warning("请选择要删除的图形");
+    ElMessage.warning(result.message);
   }
 };
 
@@ -192,7 +94,6 @@ const handleSubmit = () => {
   // 提交时,从当前的矢量图层中获取所有的已经绘制的矢量
   // 转为GeoJSON格式，然后发送给后端
   // 用一个feature
-
   const features = mapStore.getActiveVecSource().getFeatures();
   console.log("图层上的所有要素:", features);
 
@@ -201,18 +102,16 @@ const handleSubmit = () => {
   console.log("所有要素的 GeoJSON:", geojson);
 };
 
-/* 
-  开始绘制,进行绘制,绘制完成
-  绘制完成一个,直接结束交互,支持选中编辑以及删除,也可以进行新的绘制,之前矢量需要保留
-  所有已经绘制的矢量,点击时高亮显示,这时候可以进行编辑或者删除,
-  删除的交互通过右键实现? 右键弹出一个弹窗,然后进行删除
-*/
-
 const handleGoBack = () => {
   emit("back");
 };
 onMounted(() => {
   addInteraction();
+});
+
+onUnmounted(() => {
+  // 销毁交互
+  removeAllInteractions();
 });
 </script>
 
@@ -255,8 +154,8 @@ onMounted(() => {
           <el-button v-if="!isDrawing" @click="handleStartDraw">开始绘制</el-button>
           <el-button v-else type="primary">绘制中</el-button>
           <el-button @click="handleCancel">取消</el-button>
-          <el-button @click="handleClear">清除全部</el-button>
-          <el-button @click="handleDelVec">删除选中</el-button>
+          <el-button @click="handleClearFeatures">清除全部</el-button>
+          <el-button @click="handleDelFeature">删除选中</el-button>
         </div>
       </div>
 
